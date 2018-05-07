@@ -57,7 +57,7 @@
     <div id="map"></div>
 
 <script>
-//create a map object for us to input the map and it's components into.
+//create a map object for us to input the map and it's components into. 
 var map = L.map('map', {zoomControl: false, scrollWheelZoom: true}).setView([30,-150], 3);
 L.tileLayer('http://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png').addTo(map);
 
@@ -65,7 +65,8 @@ L.tileLayer('http://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png').addTo(m
 d3.json('assets/earthquakes.geojson').then(function(data) {
 
 //////////////////////////////////////////////////PREP THE DATA////////////////////////////////////////////////////////
-  //create crossfilter passes each feature to the filter
+  //create crossfilter passes each feature to the filter. We have to pass it through the crossfilter before we can split up with data using 
+  //the .dimensions() method
   var filter = crossfilter(data.features); //passes the features to the crossfilter
 
 // groups everything together into one group, this is used to quickly search all of the data at once
@@ -79,7 +80,10 @@ d3.json('assets/earthquakes.geojson').then(function(data) {
   });
 
 //////////////////////////////////////////////SORT THE DATA///////////////////////////////////////////////////////////
-//returns the geometry for each feature; this is the points at which each earthquake happened
+//Now that we have our initial data imported and in the right format using crossfilter we now have to sort out the data that we want to display, set up
+  //the chart space and populate the graphs
+  
+  //returns the geometry for each feature; this is the points at which each earthquake happened
   var geomDimension = filter.dimension(function(d) {
     return d.geometry
   });
@@ -143,7 +147,7 @@ d3.json('assets/earthquakes.geojson').then(function(data) {
   }).addTo(map);
 
 /////////////////////////////////////CREATE THE CHARTS////////////////////////////////////////////////////////////////
-    //binds the barChart  to the <div> that we created earlier
+    //binds the barChart  to the <div> elements that we created earlier in the <body>
     var magChart = dc.barChart('#mag-chart');
   //define the characteristics of the chart before we actually add the data to it
     magChart
@@ -182,14 +186,14 @@ d3.json('assets/earthquakes.geojson').then(function(data) {
       .dimension(dateDimension)
       .group(dateDimensionGroup)
       .elasticY(true)
-      .x(d3.scaleTime().domain([new Date(2016, 7, 15), new Date(2016, 8, 1)]))
+      .x(d3.scaleTime().domain([new Date(2016, 7, 15), new Date(2016, 8, 1)]))//
       .xUnits(d3.timeDays);//timeDate object that has the format for the date
 
 
   var earthquakeCount = dc.dataCount('.dc-data-count');//creates text depicting how many earthquakes are on screen, needs a <p> element
   earthquakeCount
     .dimension(filter)
-    .group(all)
+    .group(all) //since we're counting how many records we have we use the 'all' variable but we could have used any variable that had the total counts
     .html({
       some: '<strong>%filter-count</strong> selected out of <strong>%total-count</strong> records' +
           ' | <a href=\'javascript:dc.filterAll(); dc.renderAll();\'>Reset All</a>',
@@ -198,7 +202,7 @@ d3.json('assets/earthquakes.geojson').then(function(data) {
 
   /////////////////////////////////////////DRAW ALL THE CHARTS//////////////////////////////////////////////////////////
   dc.renderAll();//activates everything
-
+//we can render things one at a time but it is more efficent (and easier) to render everything at the end
 
 
 ////////////////////////////////////////LISTEN FOR CHANGES ON THE MAP//////////////////////////////////////////////////
