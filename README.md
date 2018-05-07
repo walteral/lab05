@@ -1,10 +1,8 @@
 # Area Chart
 
-**geoviz type**: D3 Area Chart | **last updated**: 06 MAy 18 | **applicable data types** | **Contributors:** [Alex Walters](https://github.com/walteral/)
+**geoviz type**: DC earth quakechart | **last updated**: 08 May 18 | **applicable data types** | **Contributors:** [Alex Walters](https://github.com/walteral/)
 
-visualizing the `image.jpg` here to illustrator the type of geovisualization
-
-Introduction: H
+Introduction: 
 
 ## 1\. Set up the workspace
 
