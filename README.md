@@ -1,13 +1,13 @@
-# DC.js Fundamentals
+# DC.js example
 
 > Spring 2018 | Geography 4/572 | Geovisualization: Geovisual Analytics
 >
 > **Instructor:** Bo Zhao  **Location:** WITH 205 | **Time:** TR 1100 - 1150
 
 **Learning Objectives**
-
-- Understand the fundamental concepts, functions of DC.js; and
-- Able to draw a chart using Dc.js.
+-create bar charts that are filtered dynamiclly
+-create a line chart that is filtered dynamiclly
+-create a map that acts as the filter for the charts
 
 `dc.js` is a JavaScript Library that allow you to develop graphs/charts, and highly interactive Dashboards. `dc.js` builds on `d3.js` and use `d3.js` to render charts in CSS friendly SVG format. By using this library you will be able to develop bar chart (histogram), pie chart, row chart, line chart, bubble chart, geo choropleth chart, and others. You can link the charts to each other to make a well connected charting interface for your work.
 
@@ -45,6 +45,7 @@ Please copy the following libraries in the same order to your html file. Besides
 
   
 ```
+For this exercise we will be looking to display four major items: 1) a bar chart showing the magnitude of each earthquake, 2) a bar chart showing the depth of each earthquake, 3) an area chart showing the number of earthquakes a specific datas and 4) a map where each earthquake happened.
 
 Next add the correct elements that you will be updating to the body of the html file. In this example we will be creating a text narrative that will display the number of recorded events in a <p>, a earthquake magnitude chart that will be contained in a <div>, a earthquake depth chart that will be contained in another <div> chart, a area chart displaying the nubmer of earthquakes by day in a <div> and finally a map element.
 
@@ -58,102 +59,228 @@ Next add the correct elements that you will be updating to the body of the html 
     <div id="map"></div>
     
 **Javascript
+Next within the `<script>` we will place the rest of our code. It is broken down into several simple steps: 
+1) Create a basemap
+2) Prep the data
+3) Sort the Data
+4) Group the Data
+5) Add the markers to the map
+6) Create the Charts
+7) Draw the Charts
+8) Add listeners
 
-Next within the `<script>` we will place the rest of our code. 
+## 1) Create the basemap
+First create the basemap that you will add to the webpage. Here we are using the cartoDB 'dark_all' map to style our basemap
 
-First create the map that you will add to the webpage. 
+    var map = L.map('map', {zoomControl: false, scrollWheelZoom: true}).setView([30,-150], 3);
+    L.tileLayer('http://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png').addTo(map);
+    
+## 2) Prep the data
 
-var map = L.map('map', {zoomControl: false, scrollWheelZoom: true}).setView([30,-150], 3);
-L.tileLayer('http://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png').addTo(map);
+Since DC can't use data driectly from our source we have to change it into a format that it can read. Here we will be using the crossFilter() function to set up the data. Add the .csv using `d3.json` and create a filter variable that will hold all of our data. 
+
+    d3.json('assets/earthquakes.geojson').then(function(data) {
+
+      var filter = crossfilter(data.features); 
+      
+ Now that we have the data in a format the DC can use we have to use another method to sort it. We will use the .dimension() method to seperate out each record, for now we want everything so create a variable everything and create a function to return each record.
+ 
+      var everything = filter.dimension(function(d) {
+        return d
+      });
+
+## 3) Sort the data
+Now that we have the data in a format that DC can read we can create differenet variables where we sort the data to display what we want shown. Similar to creating the `everything` variable we will use the .dimension() method to sort through the data. Recall that one of the elements that we want to show is the point locations of the earthquakes, to get those we can sort through our data with the .dimension() method and store it in a variable. This function takes our pre-formated `filter` variable and sorts out just the geometry.  
+
+           var geomDimension = filter.dimension(function(d) {
+            return d.geometry
+          });
+
+Next we will want to find out the date that the earthquakes took place. To do that we will have to convert the time that is a given property in the geojson to a format that DC can read using the d3.timeDay method.
+
+    var dateDimension = filter.dimension(function(d) {
+
+        return d3.timeDay(new Date(d.properties.time));
+    });
+    
+The next two steps we will gather the magnitude and depth variables using the same .dimension() method but this time with a new feature, the lamda operator. This allows us to sort data in categories easily within a function. In this example we are sorting the data based on the intensity of the magnitude and depth of the earthquake.
+    
+    var magDimension = filter.dimension(function(d) {
+    var mag = d.properties.mag;
+    return  mag < 1.2 ? '1-1.2' :
+            mag < 1.5 ? '1.2-1.5' :
+            mag <   2 ? '1.5-2' :
+            mag < 2.5 ? '2-2.5' :
+            mag <   3 ? '2.5-3' :
+                      '>3'
+  });
+
+    var depthDimension = filter.dimension(function(d) {
+        var depth = d.properties.depth;
+        return  depth <   5 ? ' <5'   :
+                depth <  10 ? ' 5-10' :
+                depth <  50 ? '10-50' :
+                depth < 100 ? '50-100':
+                        '>100'
+    });
+
+## 4)Group the Data
+
+This is an easy step, now that we have our variables with our sorted data (geometry, date, depth and magnitude) we have to group them back together so that DC can read them more efficently. To do this we will use the .group() method.
+
+      var magDimensionGroup = magDimension.group();
+
+      var depthDimensionGroup = depthDimension.group();
+
+      var dateDimensionGroup = dateDimension.group();
+
+      var all = filter.groupAll();
+
+The last variable we used .groupAll() instead of group. This is because we have multiple dimensions in that variable that needed to be grouped together for DC to use. 
+
+## 5) Add the Markers to the Map
+
+Now we can finally start adding some data! This step have been covered in previous labs, we will be adding simple markers to the map based on the geometry points of the data. We'll add custom markers using `pointToLayer` and add a bind a popup showing the magnitude of each earthquake to those markers.
+
+      var geoJsonLayer = L.geoJson({
+        type: 'FeatureCollection',
+        features: geomDimension.top(Infinity)
+      }, {
+        pointToLayer: function (feature, latlng) {
+          return L.circleMarker(latlng, {
+            radius: Math.pow(feature.properties.mag, 2)/2,
+            fillColor: "steelblue",
+            color: "#fff",
+            weight: 1,
+            stroke: false,
+            opacity: 0.1,
+            fillOpacity: 0.1
+          })
+        },
+        onEachFeature: function (feature, layer) {
+            layer.bindTooltip(feature.properties.mag.toString());
+        }
+      }).addTo(map); 
+
+## 6) Create the Charts
+Now that we have our variables sorted to show the data that we want displayed we have to create the chart that the data go into. DC offers a few easy tools to do this, in this example we'll use the `dc.barChart`, `dc.lineChart` and `dataCount` in our charts. We first have to define the chart variable and bind it to our html element in the `<body>` sections that we want it to attach to. Once we capture the right element DC has some parameters that we need to fill out:
+`height:` the height in pixels of our chart
+`margins:` how big we want our margins to be
+`diminson:` This is our actual dimension data that we sorted out earlier and want to display
+`group:` our group variable that we created from the dimension variable earlier
+`elasticY:` this allows our y axis to update on-the-fly according to our filters (true/false)
+`x:` our x-axis scale, in this case we are using ordinal data so we'll use d3.scaleOrdinal()
+`xUnits:` What we want our units to be in for the x-axis
+`yAxis:` This is gathered from DC from our dataset
+`ticks:` how many ticks we want
 
 
-After that feed this data to crossfilter object to process this data.
-
-`var facts = crossfilter(data);` we named it as facts, each row in JSON data called fact.
-
-You can also check this data in the console writing this line `console.log(facts);`
-
-> **Note:** More details about crossfilter functions, please look at Peter Cook (201X) Getting to know Crossfilter http://animateddata.co.uk/articles/crossfilter/
-
-Now we'll have to create a dimension of our data, It means, if you want to know how many total payments you've made, for this we need to create a dimension. You can create any dimension of your data.
-
-```javascript
-var dimensionByTotal = facts.dimension(function (d){ return d.total;});
-```
-
-Then we grouped our data with the help of dimension we just created. It means if you want to know how many payments are done of the each amount (how many $100 payments). As you can see in our data there are six $90 payment and two $200 and so on. To group our data, here is the statement.
-
-```javascript
-var groupByTotal = dimensionByTotal.group(function(d){ return Math.floor(d/100)*100; });
-```
-
-Here "dimensionByTotal " is the variable we just created to generate dimension.
-
-All we have done our data related stuff, now we will move to build a bar chart. For this create an object of bar chart.
-
-```javascript
-var barChart = dc.barChart("#chart")
-```
-
-`#barChart` is the ID of the `div` in which we want to show our data.
-
-```javascript
-        var barChart = dc.barChart('#barChart')
-            .width(1024) // width of the chart
-            .height(200) // height of the chart
-            .dimension(dimensionByTotal) // dimension we create before passed as parameter
-            .group(groupByTotal) // group we created before passed as parameter to barChart method
-            .x(d3.scaleLinear().domain([0, 400])) // created x-axis scales
-            .xUnits(dc.units.fp.precision(100)); // it defines the units of x-axis
-            // .x(d3.scaleOrdinal())
-            // .xUnits(dc.units.ordinal);
-        barChart.yAxis().ticks(5);
-        barChart.xAxis().ticks(4);
-        dc.renderAll();
-```
-
-![](img/bar1.png)
+    var magChart = dc.barChart('#mag-chart');
+        magChart
+        .height(100)
+        .margins({top: 10, right: 50, bottom: 30, left: 40}) 
+        .dimension(magDimension)
+        .group(magDimensionGroup)
+        .elasticY(true)
+        .x(d3.scaleOrdinal())
+        .xUnits(dc.units.ordinal)
+        .yAxis() 
+        .ticks(3);
 
 
-**Ordinal Bar Chart**
 
-Bar charts that display the data that are classified into nominal or ordinal categories, such as in our raw data if we want to classified our data by Type, there are three types of data in our raw data, visa, tab, cash. If we develop a bar chart on type dimension the bar chart is called Odinal-Bar Chart.
+      var depthChart = dc.barChart('#depth-chart');
 
-To create ordinal bar chart just replace this code with specific methods in the code.
+      depthChart
+        .height(100)
+        .margins({top: 10, right: 50, bottom: 30, left: 40})
+        .dimension(depthDimension)
+        .group(depthDimensionGroup)
+        .elasticY(true)
+        .x(d3.scaleOrdinal())
+        .xUnits(dc.units.ordinal)
+        .yAxis()
+        .ticks(3);
 
-Total dimention with Type Dimension
+      var dateChart = dc.lineChart('#date-chart');
+      dateChart
+          .renderArea(true)//area or lines
+          .height(150)
+          .transitionDuration(1000)//how long it takes to transition
+          .margins({top: 30, right: 50, bottom: 25, left: 40})
+          .dimension(dateDimension)
+          .group(dateDimensionGroup)
+          .elasticY(true)
+          .x(d3.scaleTime().domain([new Date(2016, 7, 15), new Date(2016, 8, 1)]))
+          .xUnits(d3.timeDays);
+          
+  The last part is different isn't a chart be will update on-the-fly a text box that will count the number of elements displayed on the screen. When `All` of the elements are displayed it will display the text string, when `some` of the elements are displayed it will run the inside script.
+  
 
-`var dimensionByType = facts.dimension(function (d){ return d.type;});`
+      var earthquakeCount = dc.dataCount('.dc-data-count');//creates text depicting how many earthquakes are on screen, needs a <p> element
+      earthquakeCount
+        .dimension(filter)
+        .group(all)
+        .html({
+          some: '<strong>%filter-count</strong> selected out of <strong>%total-count</strong> records' +
+              ' | <a href=\'javascript:dc.filterAll(); dc.renderAll();\'>Reset All</a>',
+          all: 'All records selected. Please click on the graph or change the map view to apply filters.'
+        });
+  
+## 7) Draw the Charts
+This is the easiest step, now that all of the variables are sorted, the charts are planned we have to actually draw the data into the html elements. Make sure this is the last step in the process. 
 
-and Dimension Group with this new code
+     dc.renderAll()
+          
 
-`var groupByType = dimensionByType.group().reduceCount(function(d){ return d.type; });` reduceCount function counts the total number of records.
+## 8) Listen for Changes
 
-Then change the dimension and group variable from barCharts methods.
+Since we want our charts and map to update on-the-fly we have to set up listeners to look for those changes. To do this we'll create two functions: the first one will update the map as we move the viewport around based on the bounding box of the screen, and the second will update the points on the map.
 
-`.dimension(dimensionByType)`
+    function updateMapFilter() {
+        geomDimension.filter(function(d) {
+            return map.getBounds().contains(L.geoJSON(d).getBounds())
+        });
+        dc.redrawAll();
+    }
 
-`.group(groupByType)`
+    function updateMap() {
+        geoJsonLayer.clearLayers();//removes everything
+        geoJsonLayer.addData({//adds the new data to the map/chart within the scope of the filter
+            type: 'FeatureCollection',
+            features: everything.top(Infinity)
+        });
+    }
 
-Change the x-axis scale and units to ordinal
+Finally we have to place these listeners on the datasets that we want them to look at. So for the map we will call `updateMapFilter()` when the user has ended their zoom or movement. 
 
-`.x(d3.scaleOrdinal())`
+            map.on('zoomend moveend', function() {//passes the zoom and move locations as the new filter
+                updateMapFilter(); //triggers the new function
+            });
+          
+For each of the charts we will run `updateMap()` whenever the map is `filtered` so that they update when the map updates. 
 
-`.xUnits(dc.units.ordinal)`
+      magChart.on('filtered', function(chart, filter) {
+        updateMap()//calls the update map function
+      });
 
-Thats it, you see how it is easy to create charts with dc.js
+      depthChart.on('filtered', function(chart, filter) {
+        updateMap()
+      });
 
-![](img/bar2.png)
+      dateChart.on('filtered', function(chart, filter) {
+        updateMap()
+      });
 
-
-## References
-
-[1] [https://utopian.io/utopian-io/@faad/tutorial-1-dive-into-dc-js-a-javascript-library-bar-chart](https://utopian.io/utopian-io/@faad/tutorial-1-dive-into-dc-js-a-javascript-library-bar-chart)
-
-[2] Dc.js examples
-
-- [Area Chart](http://dc-js.github.io/dc.js/examples/area.html)
-
-- [Bar Chart](http://dc-js.github.io/dc.js/examples/bar.html)
-
-- [Line Chart](http://dc-js.github.io/dc.js/examples/line.html)
+    })
+          
+          
+          
+          
+          
+          
+          
+          
+          
+          
+      
