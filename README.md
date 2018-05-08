@@ -46,7 +46,7 @@ Please copy the following libraries in the same order to your html file. Besides
   
 ```
 
-Next add the correct elements to the body of the html file
+Next add the correct elements that you will be updating to the body of the html file. In this example we will be creating a text narrative that will display the number of recorded events in a <p>, a earthquake magnitude chart that will be contained in a <div>, a earthquake depth chart that will be contained in another <div> chart, a area chart displaying the nubmer of earthquakes by day in a <div> and finally a map element.
 
     <p class = "dc-data-count">Number of Earthquakes</p>
     <h4>Count by Magnitude</h4>
@@ -57,23 +57,15 @@ Next add the correct elements to the body of the html file
     <div id="date-chart"></div>
     <div id="map"></div>
     
-  
-<body>
-<div id="barChart"></div>
+**Javascript
 
-<script type="text/javascript">
-    d3.json("assets/payments.json").then(function(data) {
-        ...
-        ...
-        ...
-    });
+Next within the `<script>` we will place the rest of our code. 
 
-</script>
-</body>
+First create the map that you will add to the webpage. 
 
-</html>
+var map = L.map('map', {zoomControl: false, scrollWheelZoom: true}).setView([30,-150], 3);
+L.tileLayer('http://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png').addTo(map);
 
-```
 
 After that feed this data to crossfilter object to process this data.
 
